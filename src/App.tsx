@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, RadialLinearScale } from 'chart.js';
 import { Bar, Radar, Doughnut } from 'react-chartjs-2';
+import ReactMarkdown from 'react-markdown';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, RadialLinearScale);
 ChartJS.defaults.font.family = "'Nunito Sans', ui-sans-serif, system-ui, sans-serif";
@@ -2606,6 +2607,45 @@ function ProjectAnalysisView({ project, simulator, setSimulator, navigateTo, onU
   };
 
   const currentEstimates = estimationEngine.calculateEstimates(project.features || [], simAssumptions, project.techStack || []);
+  // Cost explanation context — uses the same live values as the estimator
+const costExplanationContext = {
+  totalCost: currentEstimates.totalCost,
+  lowerEstimate: currentEstimates.costRangeMin,
+  upperEstimate: currentEstimates.costRangeMax,
+  totalHours: currentEstimates.totalHours,
+  timelineMonths: currentEstimates.timelineMonths,
+
+  assumptions: {
+    teamSize: simAssumptions.teamSize,
+    monthlyDeveloperRate: simAssumptions.devMonthlyRate,
+    targetTimeline: simAssumptions.targetTimeline,
+    monthlyCloudBudget: simAssumptions.cloudBudget,
+    monthlyApiBudget: simAssumptions.apiBudget,
+    acceptedFeatures: (project.features || []).filter(
+      feature => feature.accepted !== false
+    ).map(feature => ({
+      name: feature.name,
+      complexity: feature.complexity || 'Medium',
+      priority: feature.priority || 'Medium'
+    }))
+  },
+
+  breakdown: {
+    engineering: currentEstimates.breakdown.dev,
+    personnel: currentEstimates.breakdown.personnel,
+    cloud: currentEstimates.breakdown.cloud,
+    apis: currentEstimates.breakdown.api,
+    testing: currentEstimates.breakdown.qa,
+    contingency: currentEstimates.breakdown.contingency
+  },
+
+  rangeMethod: {
+    lowerMultiplier: 0.85,
+    upperMultiplier: 1.22,
+    explanation:
+      'The current application applies fixed multipliers to the calculated total. These are planning bounds, not statistically validated confidence intervals.'
+  }
+};
   const currentProject = { ...project, assumptions: simAssumptions };
   const currentConstraints = constraintEngine.analyze(currentProject, currentEstimates);
   const currentRisks = riskEngine.analyze(currentProject, currentEstimates);
@@ -2625,7 +2665,152 @@ function ProjectAnalysisView({ project, simulator, setSimulator, navigateTo, onU
   const featureHoursTotal = liveFeatureEstimates.reduce((sum, item) => sum + (Number(item.hours) || 0), 0);
 
   const [printAll, setPrintAll] = useState(false);
+  const [costExplanation, setCostExplanation] = useState('');
+  const [costExplanationLoading, setCostExplanationLoading] = useState(false);
+  const [costExplanationError, setCostExplanationError] = useState('');
 
+  
+const handleGenerateCostExplanation = async () => {
+  const apiKey = aiService.getApiKey();
+
+  if (!apiKey) {
+    setCostExplanationError(
+      'Add your Gemini API key in Settings before generating an explanation.'
+    );
+    return;
+  }
+
+  setCostExplanationLoading(true);
+  setCostExplanationError('');
+  setCostExplanation('');
+
+  try {
+    
+    
+const promptText = `
+You are the analytical reasoning engine of EstimateAI.
+Your purpose is to discover and explain insights that are NOT already
+obvious from the project's Overview, Cost Breakdown, Recommendations,
+or other analysis sections.
+
+Do not produce a standard project summary.
+
+ESTIMATOR RULES YOU MUST USE:
+- Accepted feature hours: Low = 30, Medium = 75, High = 150,
+  Critical = 280. If no accepted feature hours are available,
+  the estimator defaults to 200 hours.
+- Engineering cost = (total hours / 160) * monthly developer rate.
+  If team size exceeds 4, engineering cost is multiplied by 1.12.
+- Personnel = 28% of engineering cost.
+- Testing = 12% of engineering cost.
+- Contingency = 10% of engineering cost.
+- Cloud cost = monthly cloud budget * target timeline.
+- API cost = monthly API budget * target timeline.
+- Total = engineering + personnel + cloud + APIs + testing +
+  contingency + accepted technology cost adjustments, subject to
+  a minimum total of 10,000.
+- Timeline = total hours / (team size * 120), rounded to one decimal.
+- Lower and upper estimates use fixed multipliers of 0.85 and 1.22.
+  They are not statistically validated confidence intervals.
+
+YOUR TASK:
+
+1. Identify the most important cost insight.
+Do not merely name the largest category. Explain WHY it is large
+using the formulas and inputs. If the available information cannot
+establish a reason beyond the formula, state that distinction.
+
+2. Explain cost relationships.
+Explain how engineering cost affects personnel, testing and contingency
+because all three are calculated from engineering cost.
+Explain how the timeline affects cloud and API spending.
+Describe any important dependency that is not obvious from the totals.
+
+3. Find a meaningful trade-off.
+Identify one assumption that deserves attention and explain its
+potential effect using the actual formulas.
+Do not invent a new total or pretend you ran a simulation.
+If the direction or magnitude cannot be established from the supplied
+data, explain what would need to be recalculated.
+
+4. Evaluate the estimate's limitations.
+Identify which figures are formula-derived and which are user inputs.
+Explain why fixed percentage-based costs and planning bounds do not
+prove real-world accuracy.
+Do not invent an accuracy score or statistical confidence.
+
+5. Give one actionable validation step.
+Suggest a specific piece of evidence the project team should collect
+to validate a cost assumption, such as actual engineering hours,
+actual cloud bills, or historical estimate-versus-actual costs.
+Explain which part of the estimate that evidence would help validate.
+
+STRICT OUTPUT RULES:
+- Do NOT repeat the project feature list.
+- Do NOT reproduce the existing analysis page's headings or generic
+  recommendations.
+- Do NOT list every cost value again unless a value is necessary
+  to support a new insight.
+- Do NOT claim you performed scenario testing or recalculation.
+- Do NOT invent figures, formulas, data, market rates, or accuracy.
+- Focus on causal relationships, dependencies, trade-offs, and
+  limitations, not a description of the dashboard.
+- Use at most 5 concise sections.
+- Every section must contain an insight and explain WHY it matters.
+- If there is insufficient evidence for a conclusion, say so honestly.
+
+LIVE ESTIMATION CONTEXT:
+${JSON.stringify(costExplanationContext, null, 2)}
+`;
+
+
+
+      const response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=' + encodeURIComponent(apiKey),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 1400
+            }
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error?.message || `Gemini request failed (${response.status}).`
+        );
+      }
+
+      const explanation =
+        data.candidates?.[0]?.content?.parts
+          ?.map(part => part.text || '')
+          .join('')
+          .trim();
+
+      if (!explanation) {
+        throw new Error('The AI returned an empty explanation. Please try again.');
+      }
+
+      setCostExplanation(explanation);
+    } catch (error) {
+      setCostExplanationError(
+        error instanceof Error
+          ? error.message
+          : 'Could not generate the cost explanation. Please try again.'
+      );
+    } finally {
+      setCostExplanationLoading(false);
+    }
+  };
+
+   
   const handlePrintFullReport = () => {
     setPrintAll(true);
     setTimeout(() => window.print(), 120);
@@ -2902,6 +3087,146 @@ function ProjectAnalysisView({ project, simulator, setSimulator, navigateTo, onU
               </div>
             </Card>
           </div>
+
+          
+          <Card>
+            <CardHeader
+              icon={Sparkles}
+              title="AI Cost Reasoning"
+              subtitle="Understand why this estimate was produced, which assumptions influence it, and where uncertainty remains."
+              right={<span className="ea-chip">AI-powered</span>}
+            />
+
+            <div className="ea-panel mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <span className="ea-panel-label">Calculated total</span>
+                  <div className="font-extrabold ea-ink mt-1">
+                    {formatINR(currentEstimates.totalCost)}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="ea-panel-label">Team size</span>
+                  <div className="font-extrabold ea-ink mt-1">
+                    {simAssumptions.teamSize} developers
+                  </div>
+                </div>
+
+                <div>
+                  <span className="ea-panel-label">Developer monthly rate</span>
+                  <div className="font-extrabold ea-ink mt-1">
+                    {formatINR(simAssumptions.devMonthlyRate)}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="ea-panel-label">Estimated duration</span>
+                  <div className="font-extrabold ea-ink mt-1">
+                    {formatMonths(currentEstimates.timelineMonths)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            
+            <button
+              type="button"
+              onClick={handleGenerateCostExplanation}
+              disabled={costExplanationLoading}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                padding: '12px 20px',
+                borderRadius: 10,
+                background: costExplanationLoading ? '#9b83ed' : '#7547f5',
+                color: '#ffffff',
+                fontSize: 14,
+                fontWeight: 700,
+                border: '1px solid #7547f5',
+                boxShadow: '0 4px 12px rgba(117, 71, 245, 0.25)',
+                cursor: costExplanationLoading ? 'wait' : 'pointer',
+                transition: 'background 0.2s ease, transform 0.2s ease'
+              }}
+            >
+              <Sparkles size={17} />
+              {costExplanationLoading
+                ? 'Analysing cost assumptions...'
+                : costExplanation
+                  ? 'Regenerate AI explanation'
+                  : 'Explain this estimate with AI'}
+            </button>
+
+
+            {costExplanationError && (
+              <div className="ea-panel mt-4" role="alert">
+                <p className="text-sm">{costExplanationError}</p>
+              </div>
+            )}
+
+            {costExplanationLoading && (
+              <p className="ea-hint mt-3">
+                Reviewing the current estimate, cost breakdown and assumptions...
+              </p>
+            )}
+
+            {costExplanation && (
+              <div
+                className="ea-panel mt-4"
+                style={{ padding: 18 }}
+              >
+                <div className="flex items-center gap-2 ea-eyebrow mb-3">
+                  <Sparkles className="w-4 h-4" />
+                  Explanation based on the current estimate
+                </div>
+
+                
+                <div
+                  className="text-sm leading-7"
+                  style={{ overflowWrap: 'anywhere' }}
+                >
+                  <ReactMarkdown
+                    components={{
+                      h1: ({ children }) => (
+                        <h2 className="text-lg font-bold mt-5 mb-3">{children}</h2>
+                      ),
+                      h2: ({ children }) => (
+                        <h3 className="text-base font-bold mt-5 mb-2">{children}</h3>
+                      ),
+                      h3: ({ children }) => (
+                        <h4 className="font-bold mt-4 mb-2">{children}</h4>
+                      ),
+                      p: ({ children }) => (
+                        <p className="mb-3 leading-7">{children}</p>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="list-disc pl-5 mb-4 space-y-2">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal pl-5 mb-4 space-y-2">{children}</ol>
+                      ),
+                      strong: ({ children }) => (
+                        <strong className="font-bold">{children}</strong>
+                      )
+                    }}
+                  >
+                    {costExplanation}
+                  </ReactMarkdown>
+                </div>
+
+
+                <p className="ea-hint mt-4 pt-3"
+                  style={{ borderTop: '1px solid var(--ea-line)' }}
+                >
+                  This is an AI-generated interpretation of the supplied
+                  calculation, not independent proof that the estimate is accurate.
+                </p>
+              </div>
+            )}
+          </Card>
+
 
           <Card>
             <CardHeader
