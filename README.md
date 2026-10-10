@@ -1,32 +1,74 @@
-# React + TypeScript + Vite
+# EstimateAI
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+**AI-Assisted Cost Estimation and Project Planning**
 
-Currently, two official plugins are available:
+EstimateAI is a web application that combines structured cost calculations with AI-powered analysis to help users evaluate project requirements, estimate costs, assess feasibility, and plan resources.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- **Project Setup:** Define project details, scope, and requirements.
+- **Cost Estimation:** Calculate estimated costs using project inputs and resource requirements.
+- **Feasibility Analysis:** Evaluate project feasibility and identify constraints.
+- **AI-Powered Suggestions:** Generate recommendations for project requirements, features, and technical decisions.
+- **Risk Assessment:** Identify potential risks and planning challenges.
+- **Resource Planning:** Organize the resources required for project execution.
+- **Project Roadmap:** Structure development stages and milestones.
+- **Scenario Comparison:** Compare alternative project plans and estimated costs.
+- **Market Research:** Explore relevant market considerations.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Technology Stack
 
-## Expanding the Oxlint configuration
+- React
+- TypeScript
+- Vite
+- Google Gemini API
+- Firebase Authentication
+- CSS
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Getting Started
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+### Prerequisites
+
+- Node.js
+- npm
+- A configured Firebase project
+- A Google Gemini API key
+
+### Installation
+
+Clone the repository and install the dependencies:
+
+```bash
+git clone https://github.com/HanchanahalKeerthana/EstimateAI.git
+cd EstimateAI
+npm install
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Open the local URL provided in the terminal.
+
+## Configuration
+
+Configure Firebase Authentication with the sign-in providers required by the application. Add the Gemini API key through the application's Settings interface when prompted.
+
+Never commit API keys, passwords, or private credentials to the repository.
+
+## Project Status
+
+EstimateAI is a hackathon prototype focused on cost estimation, feasibility analysis, resource planning, and AI-assisted project decisions.
+
+## Future Improvements
+
+- Validate estimates against historical actual costs.
+- Improve estimation accuracy using past project data.
+- Introduce confidence intervals and accuracy metrics.
+- Refine resource cost predictions and reporting.
+
+## License
+
+No license has been specified yet.
